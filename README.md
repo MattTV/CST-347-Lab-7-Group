@@ -1,6 +1,6 @@
 # Lab 7
 
-Yusuf Ahmed
+Yusuf Ahmed - git bash
 
 ## Getting started
 
