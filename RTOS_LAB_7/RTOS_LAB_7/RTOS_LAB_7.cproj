@@ -323,6 +323,7 @@
       <Value>printf=iprintf</Value>
       <Value>__SAM4E16E__</Value>
       <Value>OIT_4LED_4BTN_BOARD_EXT1</Value>
+      <Value>OIT_4LED_4BTN_BOARD_EXT3</Value>
     </ListValues>
   </armgcc.compiler.symbols.DefSymbols>
   <armgcc.compiler.directories.IncludePaths>

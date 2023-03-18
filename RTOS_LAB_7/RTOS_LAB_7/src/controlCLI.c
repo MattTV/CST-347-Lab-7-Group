@@ -74,7 +74,7 @@ portBASE_TYPE prvChangeMaxSpeed(char *pcWriteBuffer, size_t xWriteBufferLen, con
 	
 	maxSpeedRx[maxSpeedRxStringLength] = '\0';
 	
-	MaxSpeed = atoi(maxSpeedRx);
+	Elevator.max_speed = atoi(maxSpeedRx);
 	
 	return pdFALSE;
 }
@@ -88,7 +88,7 @@ portBASE_TYPE prvChangeAcceleration(char *pcWriteBuffer, size_t xWriteBufferLen,
 	
 	accelRx[accelRxStringLength] = '\0';
 	
-	Acceleration = atoi(accelRx);
+	Elevator.acceleration = atoi(accelRx);
 	
 	return pdFALSE;
 }
@@ -102,11 +102,12 @@ portBASE_TYPE prvSendToFloor(char *pcWriteBuffer, size_t xWriteBufferLen, const 
 	
 	floorNumRx[floorNumRxStringLength] = '\0';
 	
-	int floorNum = atoi(floorNumRx);
+	int floorNum = atoi(floorNumRx)*10;
 	
 	ElevatorInfo_s tempElevatorInfo = {floorNum,SEND_TO_FLOOR};
 	
-	xQueueSendToBack(ElevatorQueue,&tempElevatorInfo,portMAX_DELAY);
+	if (!Elevator.eStop)
+		xQueueSendToBack(ElevatorQueue,&tempElevatorInfo,portMAX_DELAY);
 	
 	return pdFALSE;
 }

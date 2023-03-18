@@ -72,27 +72,39 @@ void RxTask (void * pvParameters)
 		{	
 			if (message[cmdIndex] == '\r')
 			{
-				//message[cmdIndex] = '\0';
+				message[cmdIndex] = '\0';
 				xQueueSendToBack(TxQueue,&endCmd,portMAX_DELAY);
 				
 				//Check for specific elevator keys
-				uint8_t EleCheckInputs = checkElevatorInputs(message[cmdIndex]);
+				int EleCheckInputs = checkElevatorInputs(message[0]);
 				if (EleCheckInputs != -1)
 				{
 					ElevatorInfo_s tempEleInfo = {-1,EleCheckInputs};
-					xQueueSendToBack(ElevatorQueue,&tempEleInfo,portMAX_DELAY);
+					
+					if (!Elevator.eStop)
+						xQueueSendToBack(ElevatorQueue,&tempEleInfo,portMAX_DELAY);
+					else if (EleCheckInputs == EM_CLEAR)
+						xQueueSendToBack(ElevatorQueue,&tempEleInfo,portMAX_DELAY);
+						
+					memset(message,0x00,MAX_MESSAGE);
+					cmdIndex = 0;
 				}
 				else
 				{
-					FreeRTOS_CLIProcessCommand(message,bufferCLI,MAX_CLI_MESSAGE);
-				
-					for(int i = 0; i < MAX_CLI_MESSAGE/MAX_MESSAGE; ++i)
+					BaseType_t moreMSG = 0;
+					do 
 					{
-						strncpy(tempTxBuff,bufferCLI+i*(MAX_MESSAGE-1),MAX_MESSAGE-1);
-						tempTxBuff[MAX_MESSAGE-1] = '\0';
-						xQueueSendToBack(TxQueue,&tempTxBuff,portMAX_DELAY);
-					}
-
+						moreMSG = FreeRTOS_CLIProcessCommand(message,bufferCLI,MAX_CLI_MESSAGE);
+				
+						for(int i = 0; i < MAX_CLI_MESSAGE/MAX_MESSAGE; ++i)
+						{
+							strncpy(tempTxBuff,bufferCLI+i*(MAX_MESSAGE-1),MAX_MESSAGE-1);
+							tempTxBuff[MAX_MESSAGE-1] = '\0';
+							xQueueSendToBack(TxQueue,&tempTxBuff,portMAX_DELAY);
+						}
+						
+					} while(moreMSG == pdTRUE);
+					
 					cmdIndex = 0;
 					memset(bufferCLI,0x00,MAX_CLI_MESSAGE);
 					memset(tempTxBuff,0x00,MAX_MESSAGE);
@@ -118,88 +130,113 @@ void RxTask (void * pvParameters)
 }
 
 void ElevatorTask(void * pvParameters)
-{
+{	
 	ElevatorInfo_s tempElevatorInfo;
 	while(1)
 	{
-		xQueueReceive(ElevatorQueue,&tempElevatorInfo,portMAX_DELAY);
-		
-		switch(tempElevatorInfo.EL_instruct)
+		if (xQueueReceive(ElevatorQueue,&tempElevatorInfo,0) == pdTRUE)
 		{
-			case CHANGE_MAX_SPEED :
-				MaxSpeed = tempElevatorInfo.EL_helperVar;
-				break;
-			case CHANGE_ACCEL	  :
-				Acceleration = tempElevatorInfo.EL_helperVar;
-				break;
-			case SEND_TO_FLOOR    :
-				break;
-			case EM_STOP          :
-				break;
-			case EM_CLEAR         :
-				break;
-			case GD_FLOOR_CALL    :
-				break;
-			case P1_DN_CALL       :
-				break;
-			case P1_UP_CALL       :
-				break;
-			case P2_CALL          :
-				break;
+			switch(tempElevatorInfo.EL_instruct)
+			{
+				case CHANGE_MAX_SPEED:
+					Elevator.max_speed = tempElevatorInfo.EL_helperVar;
+					break;
+					
+				case CHANGE_ACCEL:
+					Elevator.acceleration = tempElevatorInfo.EL_helperVar;
+					break;
+					
+				case SEND_TO_FLOOR:
+					Elevator.isMoving = true;
+					Elevator.destination = tempElevatorInfo.EL_helperVar;
+					
+					if (Elevator.height > Elevator.destination)
+						Elevator.movingUp = false;
+						
+					else if (Elevator.height < Elevator.destination)
+						Elevator.movingUp = true;
+						
+					break;
+					
+				case EM_STOP:
+					Elevator.eStop = true;
+					Elevator.isMoving = true;
+					Elevator.movingUp = false;
+					Elevator.destination = GND;
+					break;
+					
+				case EM_CLEAR:
+					Elevator.eStop = false;
+					break;
+					
+				case GD_FLOOR_CALL:
+					Elevator.isMoving = true;
+					Elevator.movingUp = false;
+					Elevator.destination = GND;
+					break;
+					
+				case P1_DN_CALL:
+				
+					Elevator.isMoving = true;
+					Elevator.destination = P1;
+					
+					if (Elevator.height > Elevator.destination)
+						Elevator.movingUp = false;
+						
+					else if (Elevator.height < Elevator.destination)
+						Elevator.movingUp = true;
+							
+					break;
+					
+				case P1_UP_CALL:
+					Elevator.isMoving = true;
+					Elevator.destination = P1;
+					
+					if (Elevator.height > Elevator.destination)
+						Elevator.movingUp = false;
+						
+					else if (Elevator.height < Elevator.destination)
+						Elevator.movingUp = true;
+					break;
+					
+				case P2_CALL:
+					Elevator.isMoving = true;
+					Elevator.destination = P2;
+					
+					if (Elevator.height > Elevator.destination)
+						Elevator.movingUp = false;
+					
+					else if (Elevator.height < Elevator.destination)
+						Elevator.movingUp = true;
+					break;
+			}
 		}
 		
+		if (Elevator.isMoving && (abs(Elevator.speed) < Elevator.max_speed))
+		{
+			Elevator.speed += Elevator.movingUp ? Elevator.acceleration : (-1 * Elevator.acceleration);
+		}
+		
+		if(Elevator.isMoving)
+			Elevator.height += Elevator.speed;
+
+		if (Elevator.height < 0)
+			Elevator.height = 0;
+
+		else if (Elevator.height >= Elevator.max_height)
+		{
+			Elevator.height = Elevator.max_height;
+			Elevator.isMoving = false;
+		}
+		
+		if (Elevator.movingUp && (Elevator.height >= Elevator.destination) \
+		|| (!Elevator.movingUp) && (Elevator.height <= Elevator.destination))
+			ReachedDest();
+
+		vTaskDelay(1000/portTICK_PERIOD_MS);
 	}
 }
 
-/**********************************************************************
-* Purpose: This function calls other helper functions to toggle the current LED
-*
-* Precondition:
-*     Take pvParameters which is a struct containing info about the LED
-*
-* Postcondition:
-*      Reads from a queue to control the speed of the current LED
-*
-************************************************************************/
-void toggleLED(void * pvParameters)
-{	
-	int ledNumCopy = LEDStructInfo.LedNum;
-	uint ledDelayCopy = LEDStructInfo.Delay;
-	
-	LEDStructInfo.LedNum = 0;
-	LEDStructInfo.Delay = 0;
-	
-	xQueueHandle currQueue;
-	BaseType_t currLed;
-	switch(ledNumCopy)
-	{
-		case 1: 
-			currLed=EXT1_LED_1_PIN;
-			currQueue = Led1Queue;
-			break;
-		case 2:
-			currLed=EXT1_LED_2_PIN;
-			currQueue = Led2Queue;
-			break;
-		case 3:
-			currLed=EXT1_LED_3_PIN;
-			currQueue = Led3Queue;
-			break;
-		default:
-			currLed=0;
-	}
-	
-	while (true)
-	{	
-		ioport_toggle_pin_level(currLed);
-		
-		if (uxQueueMessagesWaiting(currQueue) == pdTRUE)
-		{
-			xQueueReceive(currQueue,&ledDelayCopy,0);
-		}
-		vTaskDelay(ledDelayCopy/portTICK_PERIOD_MS);
-	}
-}
 
 /**********************************************************************
 * Purpose: This function blinks an on-board LED
@@ -224,4 +261,36 @@ void taskHeartbeat (void * pvParameters)
 		vTaskDelay(xDelay);
 		
 	}
+}
+
+void DisplayElevatorStatus()
+{
+	while(1)
+	{
+		ElevatorStatusUpdate();
+		vTaskDelay(500/portTICK_PERIOD_MS);
+	}
+}
+
+void dirTask(void * pvParameters)
+{    
+    while (true)
+    {
+        if (Elevator.movingUp && Elevator.isMoving)
+        {
+            setLED(4, 1);
+            setLED(5, 0);
+        }
+        else if (!Elevator.movingUp && Elevator.isMoving)
+        {
+            setLED(5, 1);
+            setLED(4, 0);
+        }
+        else
+        {
+            setLED(4, 0);
+            setLED(5, 0);
+        }
+		vTaskDelay(1/portTICK_PERIOD_MS);
+    }
 }

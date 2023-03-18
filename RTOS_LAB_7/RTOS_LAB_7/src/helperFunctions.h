@@ -15,6 +15,11 @@ xQueueHandle ElevatorQueue;
 TaskHandle_t buttonTaskHandle;
 
 void initializeTasksAndQueues(void);
-uint8_t checkElevatorInputs(char charRx);
+int checkElevatorInputs(char charRx);
+void ElevatorStatusUpdate(void);
+void elevatorDoorOpen(void);
+void elevatorDoorClose(void);
+void MotorFreq (void);
+void ReachedDest(void);
 
 #endif /* HELPERFUNCTIONS_H_ */

@@ -10,7 +10,6 @@
 void initializeLEDDriver(void);
 uint8_t readLED(uint8_t uiLedNum);
 uint8_t setLED(uint8_t uiLedNum, uint8_t uiLedValue);
-void toggleLED(void * pvParameters);
-
+uint8_t toggleLED(uint8_t uiLedNum);
 
 #endif /* LED_DRIVER_H_ */

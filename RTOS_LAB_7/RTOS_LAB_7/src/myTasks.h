@@ -27,17 +27,21 @@
 #define P1_UP_CALL		 7
 #define P2_CALL			 8
 
+#define GND				 0
+#define P1				 500
+#define P2				 510
+
 xQueueHandle QueueUart;
-xQueueHandle Led1Queue;
-xQueueHandle Led2Queue;
-xQueueHandle Led3Queue;
+xQueueHandle Led1Queue1;
+xQueueHandle Led2Queue1;
+xQueueHandle Led3Queue1;
+xQueueHandle Led1Queue3;
+xQueueHandle Led2Queue3;
+xQueueHandle Led3Queue3;
 
 TaskHandle_t Led1TaskHandle;
 TaskHandle_t Led2TaskHandle;
 TaskHandle_t Led3TaskHandle;
-
-int MaxSpeed;
-int Acceleration;
 
 int buttonState;
 
@@ -57,6 +61,21 @@ typedef struct {
 	int EL_instruct;
 	} ElevatorInfo_s;
 
+typedef struct {
+	int speed;
+	int acceleration;
+	int max_speed;
+	int height;
+	int max_height;
+	int destination;
+	bool isMoving;
+	bool movingUp;
+	bool doorOpen;
+	bool eStop;
+	} Elevator_s;
+
+Elevator_s Elevator; 
+
 //Function declarations
 void TxTask (void * pvParameters);
 void RxTask (void * pvParameters);
@@ -64,5 +83,8 @@ void UartTask (void * pvParameters);
 void ElevatorTask (void * pvParameters);
 void ButtonTask (void * pvParameters);
 void taskLEDToggle (void * pvParameters);
+void DisplayElevatorStatus(void);
+void dirTask(void * pvParameters);
+
 void taskHeartbeat (void * pvParameters);
 #endif /* MYTASKS_H_ */

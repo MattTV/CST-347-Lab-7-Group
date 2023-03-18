@@ -69,7 +69,8 @@ int main ( void )
 	
 	while( true )
 	{
-		
+		elevatorDoorOpen();
+		elevatorDoorClose();
 	}
 }
 
